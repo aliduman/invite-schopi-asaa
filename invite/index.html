@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schopi Daveti</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="flex justify-center items-center min-h-screen m-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600">
+    <div class="text-center p-10 bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4">
+        <div id="message">
+            <!-- Logo eklenebilir -->
+            <!-- <img src="logo.png" alt="Schopi" class="w-20 h-20 mx-auto mb-5"> -->
+            
+            <h2 class="text-gray-800 mb-3 text-2xl font-semibold">🎉 Liste Daveti!</h2>
+            <p class="text-gray-600 leading-relaxed mb-5">Schopi uygulamasına yönlendiriliyorsunuz...</p>
+            <div class="loader mx-auto my-5 w-12 h-12 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin-slow"></div>
+            
+            <div class="fallback hidden mt-5" id="fallback">
+                <p class="text-gray-600 mb-4">Uygulama açılmadı mı?</p>
+                <a href="#" id="openAppBtn" class="inline-block mt-5 px-10 py-3.5 bg-indigo-500 text-white no-underline rounded-full font-semibold transition-all duration-300 hover:bg-indigo-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/30">
+                    Uygulamayı Aç
+                </a>
+                <br><br>
+                <p class="text-sm text-gray-500 mb-3">Uygulama yüklü değilse:</p>
+                <a href="#" id="appStoreBtn" class="inline-block px-10 py-3.5 bg-indigo-500 text-white no-underline rounded-full font-semibold transition-all duration-300 hover:bg-indigo-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/30">
+                    App Store'dan İndir
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // URL'den token'ı al
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        
+        if (!token) {
+            document.getElementById('message').innerHTML = 
+                '<h2 class="text-gray-800 mb-3 text-2xl font-semibold">❌ Hata</h2><p class="text-gray-600 leading-relaxed">Geçersiz davet linki</p>';
+        } else {
+            // Token'ı localStorage'a kaydet (fallback için)
+            localStorage.setItem('schopi_invite_token', token);
+            
+            const deepLink = `schopi://invite?token=${encodeURIComponent(token)}`;
+            const appStoreUrl = 'https://apps.apple.com/tr/app/schopi/YOUR_APP_ID';
+            
+            let appOpened = false;
+            let attemptCount = 0;
+            
+            // Deep link butonlarını hazırla
+            document.getElementById('openAppBtn').href = deepLink;
+            document.getElementById('appStoreBtn').href = appStoreUrl;
+            
+            function tryOpenApp() {
+                attemptCount++;
+                console.log(`Uygulama açılmaya çalışılıyor (deneme ${attemptCount})...`);
+                
+                // iOS için deep link
+                window.location.href = deepLink;
+                
+                // Alternatif: iframe kullanarak (bazı iOS versiyonlarında daha iyi çalışır)
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = deepLink;
+                document.body.appendChild(iframe);
+                
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 1000);
+            }
+            
+            // Sayfa görünürlüğü değiştiğinde kontrol et
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    appOpened = true;
+                    console.log('✅ Uygulama muhtemelen açıldı');
+                }
+            });
+            
+            // Blur eventi - kullanıcı başka bir uygulamaya geçti
+            window.addEventListener('blur', function() {
+                appOpened = true;
+                console.log('✅ Uygulama muhtemelen açıldı (blur)');
+            });
+            
+            // Sayfa yüklenince otomatik dene
+            window.onload = function() {
+                // 500ms bekle, sonra dene
+                setTimeout(tryOpenApp, 500);
+                
+                // 3 saniye sonra fallback göster
+                setTimeout(function() {
+                    if (!appOpened) {
+                        console.log('⚠️ Uygulama açılmadı, fallback gösteriliyor');
+                        const fallback = document.getElementById('fallback');
+                        fallback.classList.remove('hidden');
+                        fallback.classList.add('block');
+                        
+                        // Mesajı güncelle
+                        const loader = document.querySelector('.loader');
+                        if (loader) loader.style.display = 'none';
+                        const h2 = document.querySelector('h2');
+                        if (h2) h2.textContent = 'Uygulama Bulunamadı';
+                        const p = document.querySelector('p');
+                        if (p) p.textContent = 'Schopi uygulaması yüklü değil veya açılamadı.';
+                    }
+                }, 3000);
+                
+                // 5 saniye sonra hala açılmadıysa App Store'a yönlendir
+                setTimeout(function() {
+                    if (!appOpened && !document.hidden) {
+                        console.log('⚠️ App Store\'a yönlendiriliyor...');
+                        document.getElementById('message').innerHTML = 
+                            '<h2 class="text-gray-800 mb-3 text-2xl font-semibold">📱 App Store\'a Yönlendiriliyorsunuz</h2>' +
+                            '<p class="text-gray-600 leading-relaxed mb-5">Schopi uygulamasını indirmek için App Store\'a yönlendiriliyorsunuz...</p>' +
+                            '<div class="loader mx-auto my-5 w-12 h-12 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin-slow"></div>';
+                        
+                        setTimeout(function() {
+                            window.location.href = appStoreUrl;
+                        }, 1500);
+                    }
+                }, 5000);
+            };
+            
+            // Manuel buton tıklamalarını dinle
+            document.getElementById('openAppBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                tryOpenApp();
+            });
+        }
+    </script>
+</body>
+</html>
